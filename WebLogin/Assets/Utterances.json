@@ -1,0 +1,23 @@
+LogDiaperIntent to log a {diaperType} diaper
+LogDiaperIntent add a {diaperType} diaper
+LogDiaperIntent log a {diaperType} diaper
+LogDiaperIntent had a {diaperType} diaper
+
+NursingIntent to start nursing on {nursingSide}
+NursingIntent to start nursing on the {nursingSide}
+NursingIntent to start a nursing session on the {nursingSide}
+NursingIntent to start on {nursingSide}
+NursingIntent to begin nursing on {nursingSide}
+
+NursingSwitchIntent to switch sides
+NursingSwitchIntent to change sides
+
+NursingCompleteIntent to stop nursing
+NursingCompleteIntent I'm done nursing
+NursingCompleteIntent finish nursing
+
+NursingPauseIntent to pause my nursing session
+NursingPauseIntent to pause
+
+NursingResumeIntent to continue nursing
+NursingResumeIntent to resume nursing

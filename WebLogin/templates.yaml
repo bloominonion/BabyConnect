@@ -1,0 +1,7 @@
+diaper_logged: "I have logged a {{ logType }} diaper in Baby Connect"
+nursing_started: "I have started a nursing session in Baby Connect"
+nursing_switch: "I have switched nursing sides in Baby Connect"
+nursing_pause: "I have paused the nursing session in Baby Connect"
+nursing_resume: "I have resumed the nursing session in Baby Connect"
+nursing_logged: "I have logged a nursing session in Baby Connect"
+nursing_not_found: "I don't currnetly have a nursing session started."

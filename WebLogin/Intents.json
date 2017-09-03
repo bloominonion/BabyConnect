@@ -1,0 +1,38 @@
+{
+  "intents": 
+  [
+    {
+      "intent": "LogDiaperIntent",
+      "slots":
+        [
+          {
+            "name": "diaperType",
+            "type": "LIST_OF_DIAPER_TYPES"
+          }
+        ]
+    },
+    {
+      "intent": "NursingIntent",
+      "slots":
+        [
+          {
+            "name": "nursingSide",
+            "type": "LIST_OF_NURSING_COMMANDS"
+          }
+        ]
+    },
+    {
+      "intent": "NursingSwitchIntent"
+    },
+    {
+      "intent": "NursingPauseIntent"
+    },
+    {
+      "intent": "NursingResumeIntent"
+    },
+    {
+      "intent": "NursingCompleteIntent"
+    },
+    
+  ]
+}
