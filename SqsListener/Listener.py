@@ -1,5 +1,11 @@
+from os import environ, path
+
+thisDir = path.dirname(__file__)
+
 import sys
-sys.path.append("../WebLogin")
+sys.path.append(path.join(thisDir,"../WebLogin"))
+sys.path.append(path.join(thisDir,"../SqsListener"))
+
 import BabyConnect
 import Authorization as auth
 from LazyDaemon import Watchdog
@@ -20,20 +26,21 @@ def main():
     while True:
         requests = GetAwsMessages()
         watchdog.check()
-        with BabyConnect.WebInterface(user=auth.GetUser(), password=auth.GetPassword()) as connection:
-            print ("Requests to log:")
-            for request in requests:
-                print (request)
-                # print ("{r[time]} : Request to log action {r[action]} of type {r[intent]}".format(r=request))
-                LogRequest(connection, request)
+        if len(requests) > 0:
+            with BabyConnect.WebInterface(user=auth.GetUser(), password=auth.GetPassword()) as connection:
+                print ("Requests to log:")
+                for request in requests:
+                    print (request)
+                    # print ("{r[time]} : Request to log action {r[action]} of type {r[intent]}".format(r=request))
+                    LogRequest(connection, request)
         time.sleep(timeSleep*60)
 
 
 # Collects the messages from the aws sqs queue and puts them into an ordered set.
 def GetAwsMessages():
-    from os import environ, path
-    environ['AWS_SHARED_CREDENTIALS_FILE'] = path.join(path.dirname(__file__), "..", ".aws/credentials")
-    environ['AWS_CONFIG_FILE'] = path.join(path.dirname(__file__), "..", ".aws/config")
+    global thisDir
+    environ['AWS_SHARED_CREDENTIALS_FILE'] = path.join(thisDir, "..", ".aws/credentials")
+    environ['AWS_CONFIG_FILE'] = path.join(thisDir, "..", ".aws/config")
 
     sqs = boto3.resource('sqs')
     queue = sqs.get_queue_by_name(QueueName='BabyConnectLogger')

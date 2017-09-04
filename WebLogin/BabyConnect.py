@@ -50,7 +50,8 @@ class WebInterface(object):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.driver.close()
+        if self.driver is not None:
+            self.driver.close()
         
     def __del__(self):
         print ("Finalizing session")
