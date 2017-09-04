@@ -1,16 +1,6 @@
 import time
 import os
 from importlib import reload
-import Listener
-
-def main():
-    sleepTime = 5 # (minutes)
-    watchdog = Watchdog(Listener)
-
-    while True:
-        watchdog.check()
-        Listener.main()
-        time.sleep(sleepTime*60)
 
 
 # Simple watchdog class to check for changes in source to reload the module file as needed
@@ -34,6 +24,3 @@ class Watchdog:
         if self.has_changed():
             print ("File change detected in \'{}\'...reloading...".format(self._module.__name__))
             reload(self._module)
-
-if __name__ == '__main__':
-    main()

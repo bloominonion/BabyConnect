@@ -2,6 +2,8 @@ import sys
 sys.path.append("../WebLogin")
 import BabyConnect
 import Authorization as auth
+from LazyDaemon import Watchdog
+import time
 try:
    import boto3
 except ImportError:
@@ -9,16 +11,22 @@ except ImportError:
    pip.main(['install', 'boto3'])
    import boto3
 
+# Global for storing nursing requests as we get them
 nursingRequests = list()
 
 def main():
-    requests = GetAwsMessages()
-    with BabyConnect.WebInterface(user=auth.GetUser(), password=auth.GetPassword()) as connection:
-        print ("Requests to log:")
-        for request in requests:
-            print (request)
-            # print ("{r[time]} : Request to log action {r[action]} of type {r[intent]}".format(r=request))
-            LogRequest(connection, request)
+    timeSleep = 5 #(minutes)
+    watchdog = Watchdog(BabyConnect)
+    while True:
+        requests = GetAwsMessages()
+        watchdog.check()
+        with BabyConnect.WebInterface(user=auth.GetUser(), password=auth.GetPassword()) as connection:
+            print ("Requests to log:")
+            for request in requests:
+                print (request)
+                # print ("{r[time]} : Request to log action {r[action]} of type {r[intent]}".format(r=request))
+                LogRequest(connection, request)
+        time.sleep(timeSleep*60)
 
 
 # Collects the messages from the aws sqs queue and puts them into an ordered set.
@@ -62,6 +70,7 @@ def GetAwsMessages():
     requests = sorted(requests, key=lambda k: k['time']) 
     return requests
 
+# Handle incoming request
 def LogRequest(con, request):
     global nursingRequests
     intent = request['action']
@@ -76,6 +85,9 @@ def LogRequest(con, request):
     else:
         print ("Swing and a miss...")
 
+# If it is a nursing message, build the nursing session up until 
+# and end message is encountered. Once that is, log the actual request
+# to the website
 def LogNursingRequest(con):
     global nursingRequests
     nursing = None
