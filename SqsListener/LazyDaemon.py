@@ -9,7 +9,6 @@ class Watchdog:
         self._module = module
         self._filename = module.__file__
         self._modified = self._get_mod_time()
-        print (self._modified)
 
     def _get_mod_time(self):
         return os.stat(self._filename).st_mtime

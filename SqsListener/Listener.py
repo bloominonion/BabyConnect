@@ -30,24 +30,26 @@ def main():
         requests = GetAwsMessages()
         watchdog.check()
         logs = []
-        print ("Requests to log:")
         for request in requests:
             result = ConvertRequest(request)
             if result is not None:
                 logs.append(result)
 
         if len(logs) > 0:
+            print ("\nRequests to log:")
             print (len(logs), "logs found")
             with BabyConnect.WebInterface(user=auth.GetUser(), password=auth.GetPassword()) as connection:
                 for log in logs:
                     if isinstance(log, BabyConnect.Nursing):
                         connection.LogNursing(log)
+                        print (log)
                     elif isinstance(log, BabyConnect.Diaper):
                         connection.LogDiaper(log)
+                        print (log)
                     else:
                         print ("Unable to handle log:", log)
         else:
-            print ("No logs found")
+            print ("...No logs found")
         time.sleep(timeSleep*60)
 
 

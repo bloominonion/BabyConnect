@@ -123,7 +123,7 @@ class Diaper(object):
         "dry" : "diaper4"
     }
     def __init__(self, logType):
-        print ("Diaper log:", logType)
+        self.logValue = logType
         dirtyOPts = 'poopy dirty messy poop crap'.split()
         wetOPts = 'wet pee'.split()
 
@@ -148,6 +148,9 @@ class Diaper(object):
 
         # Sets the id code used on the BabyConnect website
         self.id = self.ids[self.type]
+
+    def __repr__(self):
+        return "Diaper: {} ({})".format(self.logValue, self.type)
 
     def get_type(self):
         return self.type
