@@ -1,4 +1,5 @@
 from os import environ, path
+import datetime
 
 thisDir = path.dirname(__file__)
 
@@ -24,6 +25,7 @@ def main():
     timeSleep = 5 #(minutes)
     watchdog = Watchdog(BabyConnect)
     while True:
+        print ("Checking server for requests...", datetime.datetime.now().strftime("%m-%d-%y %I:%M %p"))
         requests = GetAwsMessages()
         watchdog.check()
         if len(requests) > 0:
