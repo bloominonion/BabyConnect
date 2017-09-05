@@ -1,4 +1,5 @@
 from os import environ, path
+import copy
 import datetime
 
 thisDir = path.dirname(__file__)
@@ -25,16 +26,28 @@ def main():
     timeSleep = 5 #(minutes)
     watchdog = Watchdog(BabyConnect)
     while True:
-        print ("Checking server for requests...", datetime.datetime.now().strftime("%m-%d-%y %I:%M %p"))
+        print ("Checking server for requests...", datetime.datetime.now().strftime("%m-%d-%y %I:%M %p"), end='')
         requests = GetAwsMessages()
         watchdog.check()
-        if len(requests) > 0:
+        logs = []
+        print ("Requests to log:")
+        for request in requests:
+            result = ConvertRequest(request)
+            if result is not None:
+                logs.append(result)
+
+        if len(logs) > 0:
+            print (len(logs), "logs found")
             with BabyConnect.WebInterface(user=auth.GetUser(), password=auth.GetPassword()) as connection:
-                print ("Requests to log:")
-                for request in requests:
-                    print (request)
-                    # print ("{r[time]} : Request to log action {r[action]} of type {r[intent]}".format(r=request))
-                    LogRequest(connection, request)
+                for log in logs:
+                    if isinstance(log, BabyConnect.Nursing):
+                        connection.LogNursing(log)
+                    elif isinstance(log, BabyConnect.Diaper):
+                        connection.LogDiaper(log)
+                    else:
+                        print ("Unable to handle log:", log)
+        else:
+            print ("No logs found")
         time.sleep(timeSleep*60)
 
 
@@ -50,6 +63,8 @@ def GetAwsMessages():
     client = boto3.client('sqs')
     queue_attributes = client.get_queue_attributes(QueueUrl=queue.url, AttributeNames=['ApproximateNumberOfMessages'])
     nMessages = int(queue_attributes['Attributes']['ApproximateNumberOfMessages'])
+    if nMessages == 0:
+        return list()
 
     # Poll the queue and get the messages. Multiple polling is needed to
     # ensure we get all of them (hence using a set)
@@ -79,25 +94,26 @@ def GetAwsMessages():
     requests = sorted(requests, key=lambda k: k['time']) 
     return requests
 
-# Handle incoming request
-def LogRequest(con, request):
+# Convert requests to an instance known to the web interface
+def ConvertRequest(request):
     global nursingRequests
     intent = request['action']
     if 'LogDiaper' in intent:
         diaper = BabyConnect.Diaper(request['intent'])
-        if con is not None:
-            con.LogDiaper(diaper)
+       return diaper
     elif 'Nursing' in intent:
         nursingRequests.append(request)
         if 'Complete' in intent:
-            LogNursingRequest(con)
+            return HandleNursingRequests()
     else:
         print ("Swing and a miss...")
+        return None
+    return None
 
 # If it is a nursing message, build the nursing session up until 
 # and end message is encountered. Once that is, log the actual request
 # to the website
-def LogNursingRequest(con):
+def HandleNursingRequests():
     global nursingRequests
     nursing = None
     for request in nursingRequests:
@@ -119,11 +135,10 @@ def LogNursingRequest(con):
             elif 'NursingCompleteIntent' in intent:
                 nursing.GetTimes(epoch=reqTime)
                 nursing.Finish(epoch=reqTime)
-                if con is not None:
-                    con.LogNursing(nursing)
-                print (nursing)
+                tmpNursing = copy.copy(nursing)
                 nursingRequests = []
                 nursing=None
+                return tmpNursing
         else:
             print("Bad request out of order...")
 

@@ -50,12 +50,12 @@ class WebInterface(object):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if self.driver is not None:
+        if self.driver:
             self.driver.close()
         
     def __del__(self):
-        print ("Finalizing session")
-        print (self.driver.close())
+        if self.driver:
+            self.driver.close()
 
     def LogDiaper(self, logType):
         diaper = None
