@@ -100,7 +100,7 @@ def ConvertRequest(request):
     intent = request['action']
     if 'LogDiaper' in intent:
         diaper = BabyConnect.Diaper(request['intent'])
-       return diaper
+        return diaper
     elif 'Nursing' in intent:
         nursingRequests.append(request)
         if 'Complete' in intent:
