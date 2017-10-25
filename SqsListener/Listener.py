@@ -1,7 +1,7 @@
 from os import environ, path
 import copy
 import datetime
-
+import socket
 thisDir = path.dirname(__file__)
 
 import sys
@@ -35,18 +35,19 @@ def main():
     global logHandle
     print ("Starting service...", datetime.datetime.now().strftime("%m-%d-%y %I:%M %p"), file=sys.stdout)
     timeSleep = 5 #(minutes)
-    connectionSleep = 5
+    connectionSleep = 1
+    # Sleep while systerm gets an IP
+    time.sleep(connectionSleep*60)
     watchdog = Watchdog(BabyConnect)
     checkCount = 0
     while True:
-        logHandle.write(".")
-        
         # Make sure there is internet before continuing.
         while not internet():
             print ("Failed to connect to internet..trying again in {} minutes".format(connectionSleep), file=sys.stdout)
             time.sleep(connectionSleep*60)
             connectionSleep *= 2
-            
+
+        logHandle.write(".")
         connectionSleep = timeSleep
         checkCount += 1
         curTime = datetime.datetime.now()
@@ -91,7 +92,7 @@ def internet(host="8.8.8.8", port=53, timeout=3):
       socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
       return True
    except Exception as ex:
-      print (ex.message)
+      print (ex)
       return False
 
 # Collects the messages from the aws sqs queue and puts them into an ordered set.
