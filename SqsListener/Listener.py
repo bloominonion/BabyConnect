@@ -1,12 +1,21 @@
 from os import environ, path
 import copy
 import datetime
-
+import socket
 thisDir = path.dirname(__file__)
 
 import sys
 sys.path.append(path.join(thisDir,"../WebLogin"))
 sys.path.append(path.join(thisDir,"../SqsListener"))
+
+import functools
+print = functools.partial(print, flush=True)
+
+logFile = path.join(thisDir, "Logfile.txt")
+print ("Using logfile:", logFile)
+logHandle = open(logFile, "a+")
+sys.stdout = logHandle
+sys.stderr = logHandle
 
 import BabyConnect
 import Authorization as auth
@@ -23,10 +32,29 @@ except ImportError:
 nursingRequests = list()
 
 def main():
+    global logHandle
+    print ("Starting service...", datetime.datetime.now().strftime("%m-%d-%y %I:%M %p"), file=sys.stdout)
     timeSleep = 5 #(minutes)
+    connectionSleep = 1
+    # Sleep while systerm gets an IP
+    time.sleep(connectionSleep*60)
     watchdog = Watchdog(BabyConnect)
+    checkCount = 0
     while True:
-        print ("Checking server for requests...", datetime.datetime.now().strftime("%m-%d-%y %I:%M %p"), end='')
+        # Make sure there is internet before continuing.
+        while not internet():
+            print ("Failed to connect to internet..trying again in {} minutes".format(connectionSleep), file=sys.stdout)
+            time.sleep(connectionSleep*60)
+            connectionSleep *= 2
+
+        logHandle.write(".")
+        connectionSleep = timeSleep
+        checkCount += 1
+        curTime = datetime.datetime.now()
+        if abs(curTime.hour - 1) < 0.1:
+            time.sleep(5*60*60) #sleep 5 hours
+        if checkCount % 10 == 0:
+            print ("Checking server for requests...{}: {}".format(checkCount, curTime.strftime("%m-%d-%y %I:%M %p")), file=sys.stdout)
         requests = GetAwsMessages()
         watchdog.check()
         logs = []
@@ -38,6 +66,7 @@ def main():
         if len(logs) > 0:
             print ("\nRequests to log:")
             print (len(logs), "logs found")
+            print (logs)
             with BabyConnect.WebInterface(user=auth.GetUser(), password=auth.GetPassword()) as connection:
                 for log in logs:
                     if isinstance(log, BabyConnect.Nursing):
@@ -48,10 +77,23 @@ def main():
                         print (log)
                     else:
                         print ("Unable to handle log:", log)
-        else:
-            print ("...No logs found")
+        #else:
+        #    print ("...No logs found")
         time.sleep(timeSleep*60)
 
+def internet(host="8.8.8.8", port=53, timeout=3):
+   """
+   Host: 8.8.8.8 (google-public-dns-a.google.com)
+   OpenPort: 53/tcp
+   Service: domain (DNS/TCP)
+   """
+   try:
+      socket.setdefaulttimeout(timeout)
+      socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+      return True
+   except Exception as ex:
+      print (ex)
+      return False
 
 # Collects the messages from the aws sqs queue and puts them into an ordered set.
 def GetAwsMessages():

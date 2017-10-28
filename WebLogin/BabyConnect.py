@@ -1,6 +1,8 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+from selenium.common.exceptions import WebDriverException
 from datetime import datetime, timedelta
+from pyvirtualdisplay import Display
 import platform
 import time
 import sys
@@ -8,10 +10,12 @@ import os
 
 def main():
     import Authorization
-    # with WebInterface(user=Authorization.GetUser(), password=Authorization.GetPassword()) as con:
-    #     con.LogDiaper("dirty and wet")
+    print ("Test")
+    with WebInterface(user=Authorization.GetUser(), password=Authorization.GetPassword()) as con:
+         con.LogDiaper("dirty and wet")
     #     sess = Nursing(0,500,500)
     #     con.LogNursing(sess)
+    exit()
     from pprint import pprint
     baseTime = time.time()
     testNurse = Nursing(1, epoch=baseTime)
@@ -26,6 +30,9 @@ class WebInterface(object):
     def __init__(self, user, password):
         self.user = user
         self.password = password
+        self.driver = None
+        self.display = Display(visible=0, size=(1024, 768))
+        self.display.start()
 
         if platform.system() == 'Linux':
             self.driver = webdriver.Firefox()
@@ -42,6 +49,7 @@ class WebInterface(object):
         timeWait = 2
         while "logout" not in self.driver.page_source:
             if timeCycles > 5:
+                print ("Failed to login to page")
                 break
             time.sleep(timeWait)
             timeCycles += 1
@@ -51,10 +59,22 @@ class WebInterface(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.__del__()
+<<<<<<< HEAD
         
     def __del__(self):
         if self.driver is not None:
             self.driver.close()
+=======
+
+    def __del__(self):
+        if self.driver is not None:
+            try:
+                self.driver.close()
+            except WebDriverException:
+                pass
+        else:
+            print ("Driver non-existant at cleanup")
+>>>>>>> e4c719928dbb880015f72d44f4af328dd0e70985
 
     def LogDiaper(self, logType):
         diaper = None
@@ -71,7 +91,7 @@ class WebInterface(object):
         # Set type of diaper and log it.
         self.driver.find_element_by_id(diaper.id).click()
         self.driver.find_element_by_css_selector(".ui-button-text-only .ui-button-text").click()
-        # print ("Diaper logged...")
+        print ("Diaper logged...")
 
     def LogNursing(self, nursing):
         data = nursing.GetTimes()
