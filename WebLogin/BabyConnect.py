@@ -50,11 +50,10 @@ class WebInterface(object):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        if self.driver:
-            self.driver.close()
+        self.__del__()
         
     def __del__(self):
-        if self.driver:
+        if self.driver is not None:
             self.driver.close()
 
     def LogDiaper(self, logType):
