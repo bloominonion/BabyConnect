@@ -10,14 +10,21 @@ NursingIntent to start on {nursingSide}
 NursingIntent to begin nursing on {nursingSide}
 
 NursingSwitchIntent to switch sides
+NursingSwitchIntent to switch side
+NursingSwitchIntent to switch
 NursingSwitchIntent to change sides
+NursingSwitchIntent to change side
+NursingSwitchIntent to change
+
+NursingPauseIntent to pause my nursing session
+NursingPauseIntent to pause nursing
+NursingPauseIntent to pause
+
+NursingResumeIntent to continue nursing
+NursingResumeIntent to continue
+NursingResumeIntent to resume nursing
+NursingResumeIntent to resume
 
 NursingCompleteIntent to stop nursing
 NursingCompleteIntent I'm done nursing
 NursingCompleteIntent finish nursing
-
-NursingPauseIntent to pause my nursing session
-NursingPauseIntent to pause
-
-NursingResumeIntent to continue nursing
-NursingResumeIntent to resume nursing
