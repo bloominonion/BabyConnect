@@ -1,88 +1,29 @@
-from os import environ, path
+from os import environ
+from os.path import basename, join, exists
 import copy
-import datetime
 import socket
-thisDir = path.dirname(__file__)
-
-import sys
-sys.path.append(path.join(thisDir,"../WebLogin"))
-sys.path.append(path.join(thisDir,"../SqsListener"))
-
-import functools
-print = functools.partial(print, flush=True)
-
-logFile = path.join(thisDir, "Logfile.txt")
-print ("Using logfile:", logFile)
-logHandle = open(logFile, "a+")
-sys.stdout = logHandle
-sys.stderr = logHandle
-
-import BabyConnect
-import Authorization as auth
-from LazyDaemon import Watchdog
-import time
-try:
-   import boto3
-except ImportError:
-   import pip
-   pip.main(['install', 'boto3'])
-   import boto3
+from pkg_resources import resource_filename
 
 # Global for storing nursing requests as we get them
 nursingRequests = list()
 
-def main():
-    global logHandle
-    print ("Starting service...", datetime.datetime.now().strftime("%m-%d-%y %I:%M %p"), file=sys.stdout)
-    timeSleep = 5 #(minutes)
-    connectionSleep = 1
-    # Sleep while systerm gets an IP
-    time.sleep(connectionSleep*60)
-    watchdog = Watchdog(BabyConnect)
-    checkCount = 0
-    while True:
-        # Make sure there is internet before continuing.
-        while not internet():
-            print ("Failed to connect to internet..trying again in {} minutes".format(connectionSleep), file=sys.stdout)
-            time.sleep(connectionSleep*60)
-            connectionSleep *= 2
+def SetupAwsCredentials():
+    '''
+    Sets up the environment variables for the AWS boto3 interface to find 
+    credential and configuration information.
+    '''
+    aws_credentials = resource_filename('BabyConnect.Sqs', 'aws_credentials')
+    aws_config = resource_filename('BabyConnect.Sqs', 'aws_config')
+    if not exists(aws_credentials) or not exists(aws_config):
+        print ("aws_credentials:", aws_credentials)
+        print ("aws_config:", aws_config)
+        raise OSError("Could not find credentials directory. Listener must have a folder '.aws' with credential info.")
+    environ['AWS_SHARED_CREDENTIALS_FILE'] = aws_credentials
+    environ['AWS_CONFIG_FILE'] = aws_config
 
-        logHandle.write(".")
-        connectionSleep = timeSleep
-        checkCount += 1
-        curTime = datetime.datetime.now()
-        if abs(curTime.hour - 1) < 0.1:
-            time.sleep(5*60*60) #sleep 5 hours
-        if checkCount % 10 == 0:
-            print ("Checking server for requests...{}: {}".format(checkCount, curTime.strftime("%m-%d-%y %I:%M %p")), file=sys.stdout)
-        requests = GetAwsMessages()
-        watchdog.check()
-        logs = []
-        for request in requests:
-            result = ConvertRequest(request)
-            if result is not None:
-                logs.append(result)
-
-        if len(logs) > 0:
-            print ("\nRequests to log:")
-            print (len(logs), "logs found")
-            print (logs)
-            with BabyConnect.WebInterface(user=auth.GetUser(), password=auth.GetPassword()) as connection:
-                for log in logs:
-                    if isinstance(log, BabyConnect.Nursing):
-                        connection.LogNursing(log)
-                        print (log)
-                    elif isinstance(log, BabyConnect.Diaper):
-                        connection.LogDiaper(log)
-                        print (log)
-                    else:
-                        print ("Unable to handle log:", log)
-        #else:
-        #    print ("...No logs found")
-        time.sleep(timeSleep*60)
-
-def internet(host="8.8.8.8", port=53, timeout=3):
+def CheckInternet(host="8.8.8.8", port=53, timeout=3):
    """
+   Check for an internet connection.
    Host: 8.8.8.8 (google-public-dns-a.google.com)
    OpenPort: 53/tcp
    Service: domain (DNS/TCP)
@@ -97,10 +38,7 @@ def internet(host="8.8.8.8", port=53, timeout=3):
 
 # Collects the messages from the aws sqs queue and puts them into an ordered set.
 def GetAwsMessages():
-    global thisDir
-    environ['AWS_SHARED_CREDENTIALS_FILE'] = path.join(thisDir, "..", ".aws/credentials")
-    environ['AWS_CONFIG_FILE'] = path.join(thisDir, "..", ".aws/config")
-
+    SetupAwsCredentials()
     sqs = boto3.resource('sqs')
     queue = sqs.get_queue_by_name(QueueName='BabyConnectLogger')
 
@@ -185,7 +123,3 @@ def HandleNursingRequests():
                 return tmpNursing
         else:
             print("Bad request out of order...")
-
-
-if __name__ == '__main__':
-    main()
