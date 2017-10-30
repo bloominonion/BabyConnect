@@ -1,4 +1,5 @@
 from os import environ, path
+import boto3
 import time
 
 # Credentials for testing outside of lambda function
@@ -20,9 +21,9 @@ def send_sqs_message(LogAction, LogIntent):
             'LogIntent':{
                 'StringValue': LogIntent,
                 'DataType': 'String'
-            }
+            },
             'TimeSec':{
-                'StringValue': time.time(),
+                'StringValue': str(time.time()),
                 'DataType': 'Number'
             }
     })
@@ -38,8 +39,8 @@ def build_speechlet_response(title, output, reprompt_text, should_end_session):
         },
         'card': {
             'type': 'Simple',
-            'title': "SessionSpeechlet - " + title,
-            'content': "SessionSpeechlet - " + output
+            'title': title,
+            # 'content': output
         },
         'reprompt': {
             'outputSpeech': {
@@ -131,12 +132,13 @@ def nursing_done(intent, session):
 
 def on_intent(intent_request, session):
     """ Called when the user specifies an intent for this skill """
-
-    print("on_intent requestId=" + intent_request['requestId'] +
-          ", sessionId=" + session['sessionId'])
-
     intent = intent_request['intent']
     intent_name = intent_request['intent']['name']
+
+    print("on_intent requestId=" + intent_request['requestId']
+          + ", sessionId=" + session['sessionId']
+          + ", intent=" + str(intent)
+          + ", intentName=" + intent_name)
 
     # Dispatch to your skill's intent handlers
     if intent_name == 'LogDiaperIntent':
