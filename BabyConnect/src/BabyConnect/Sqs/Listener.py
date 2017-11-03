@@ -1,25 +1,9 @@
 from os import environ
 from os.path import basename, join, exists
+from BabyConnect import LogTypes
 import copy
 import socket
-from pkg_resources import resource_filename
-
-# Global for storing nursing requests as we get them
-nursingRequests = list()
-
-def SetupAwsCredentials():
-    '''
-    Sets up the environment variables for the AWS boto3 interface to find 
-    credential and configuration information.
-    '''
-    aws_credentials = resource_filename('BabyConnect.Sqs', 'aws_credentials')
-    aws_config = resource_filename('BabyConnect.Sqs', 'aws_config')
-    if not exists(aws_credentials) or not exists(aws_config):
-        print ("aws_credentials:", aws_credentials)
-        print ("aws_config:", aws_config)
-        raise OSError("Could not find credentials directory. Listener must have a folder '.aws' with credential info.")
-    environ['AWS_SHARED_CREDENTIALS_FILE'] = aws_credentials
-    environ['AWS_CONFIG_FILE'] = aws_config
+import boto3
 
 def CheckInternet(host="8.8.8.8", port=53, timeout=3):
    """
@@ -36,90 +20,149 @@ def CheckInternet(host="8.8.8.8", port=53, timeout=3):
       print (ex)
       return False
 
-# Collects the messages from the aws sqs queue and puts them into an ordered set.
-def GetAwsMessages():
-    SetupAwsCredentials()
-    sqs = boto3.resource('sqs')
-    queue = sqs.get_queue_by_name(QueueName='BabyConnectLogger')
+class AwsMessageHandler(object):
+    def __init__(self, queue_name=None, aws_key_id=None, aws_secret_key=None, aws_region=None):
+        self.key_id = aws_key_id
+        self.key = aws_secret_key
+        self.region = aws_region
+        self.queue_name = queue_name
+        self.requests = []
+        self.nursingRequests = []
+        self.configured = False
+        
 
-    client = boto3.client('sqs')
-    queue_attributes = client.get_queue_attributes(QueueUrl=queue.url, AttributeNames=['ApproximateNumberOfMessages'])
-    nMessages = int(queue_attributes['Attributes']['ApproximateNumberOfMessages'])
-    if nMessages == 0:
-        return list()
+    def AssignQueueName(self, name):
+        if name is None or not isinstance(name, str):
+            raise ValueError("Queue name is invalid")
+        self.queue_name = name
 
-    # Poll the queue and get the messages. Multiple polling is needed to
-    # ensure we get all of them (hence using a set)
-    # This is a documented limitation to the sqs queue where it may not recieve a message if
-    # the queue has a small number of messages in it. 
-    messages = set()
-    pollCount = 0
-    while len(messages) < nMessages:
-        for message in queue.receive_messages(MessageAttributeNames=['LogAction', 'LogIntent', 'TimeSec']):
-            messages.add(message)
-            message.delete()
-        pollCount += 1
-        if pollCount > 2*nMessages:
-            break
-    
-    # Process the messages recieved into a simple format for use (discard extra info)
-    requests = []
-    for message in messages:
-        # print (message.body, ":", message.message_attributes)
-        if message.message_attributes is not None:
-            action = message.message_attributes.get('LogAction').get('StringValue')
-            intent = message.message_attributes.get('LogIntent').get('StringValue')
-            time = message.message_attributes.get('TimeSec').get('StringValue')
-            requests.append({'time':float(time), 'action':action, 'intent':intent})
-            # print ("Request to log action {} of type {}".format(action, intent))
+    def ConfigureSessionCredentials(self, aws_key_id, aws_secret_key, aws_region):
+        self.key_id = aws_key_id
+        self.key = aws_secret_key
+        self.region = aws_region
+        self.configured = True
 
-    requests = sorted(requests, key=lambda k: k['time']) 
-    return requests
+    def _CheckIfConfigured(self):
+        missing = []
+        if self.key_id is None:
+            missing.append('aws_key_id')
+        if self.key is None:
+            missing.append('aws_secret_key')
+        if self.region is None:
+            missing.append('aws_region')
+        if self.queue_name is None:
+            missing.append('aws_queue_name')
+        if len(missing) > 0:
+            raise AttributeError("Not configured. Missing the following:" + str(missing))
 
-# Convert requests to an instance known to the web interface
-def ConvertRequest(request):
-    global nursingRequests
-    intent = request['action']
-    if 'LogDiaper' in intent:
-        diaper = BabyConnect.Diaper(request['intent'])
-        return diaper
-    elif 'Nursing' in intent:
-        nursingRequests.append(request)
-        if 'Complete' in intent:
-            return HandleNursingRequests()
-    else:
-        print ("Swing and a miss...")
-        return None
-    return None
+    def GetLogs(self):
+        self._GetNewMessages()
+        logs = []
+        for log in self.requests:
+            action = self._ConvertRequest(log)
+            if action is not None:
+                logs.append(action)
+        self.requests = []
+        return logs
 
-# If it is a nursing message, build the nursing session up until 
-# and end message is encountered. Once that is, log the actual request
-# to the website
-def HandleNursingRequests():
-    global nursingRequests
-    nursing = None
-    for request in nursingRequests:
+    def _GetNewMessages(self):
+        self._CheckIfConfigured()
+
+        queue = self._GetQueue()
+
+        client = boto3.client('sqs',
+                              region_name=self.region,
+                              aws_access_key_id=self.key_id,
+                              aws_secret_access_key=self.key)
+        nMessages = self._HasMessages(client, queue)
+        if nMessages > 0:
+            # Poll the queue and get the messages. Multiple polling is needed to
+            # ensure we get all of them (hence using a set)
+            # This is a documented limitation to the sqs queue where it may not recieve a message if
+            # the queue has a small number of messages in it. 
+            messages = set()
+            pollCount = 0
+            while len(messages) < nMessages:
+                for message in queue.receive_messages(MessageAttributeNames=['LogAction', 'LogIntent', 'TimeSec']):
+                    messages.add(message)
+                    message.delete()
+                pollCount += 1
+                if pollCount > 2*nMessages:
+                    break
+            
+            # Process the messages recieved into a simple format for use (discard extra info)
+            requests = []
+            for message in messages:
+                # print (message.body, ":", message.message_attributes)
+                if message.message_attributes is not None:
+                    action = message.message_attributes.get('LogAction').get('StringValue')
+                    intent = message.message_attributes.get('LogIntent').get('StringValue')
+                    time = message.message_attributes.get('TimeSec').get('StringValue')
+                    requests.append({'time':float(time), 'action':action, 'intent':intent})
+                    # print ("Request to log action {} of type {}".format(action, intent))
+
+            requests = sorted(requests, key=lambda k: k['time']) 
+            self.requests += requests
+
+
+    def _GetQueue(self):
+        sqs = boto3.resource('sqs',
+                              region_name=self.region,
+                              aws_access_key_id=self.key_id,
+                              aws_secret_access_key=self.key)
+        queue = sqs.get_queue_by_name(QueueName=self.queue_name)
+        return queue
+
+    def _HasMessages(self, client, queue):
+        queue_attributes = client.get_queue_attributes(QueueUrl=queue.url, 
+                                                       AttributeNames=['ApproximateNumberOfMessages'])
+        nMessages = int(queue_attributes['Attributes']['ApproximateNumberOfMessages'])
+        if nMessages == 0:
+            return 0
+        return nMessages
+
+    # Convert requests to an instance known to the web interface
+    def _ConvertRequest(self, request):
         intent = request['action']
-        reqTime = request['time']
-        if 'NursingIntent' in intent:
-            side = 0
-            if request['intent'] == 'right':
-                side = 1
-            nursing = BabyConnect.Nursing(side=side, epoch=reqTime)
-            continue
-        if nursing is not None:
-            if 'NursingSwitchIntent' in intent:
-                nursing.Switch(epoch=reqTime)
-            elif 'NursingPauseIntent' in intent:
-                nursing.Pause(epoch=reqTime)
-            elif 'NursingResumeIntent' in intent:
-                nursing.Resume(epoch=reqTime)
-            elif 'NursingCompleteIntent' in intent:
-                nursing.GetTimes(epoch=reqTime)
-                nursing.Finish(epoch=reqTime)
-                tmpNursing = copy.copy(nursing)
-                nursingRequests = []
-                nursing=None
-                return tmpNursing
+        if 'LogDiaper' in intent:
+            diaper = LogTypes.Diaper(request['intent'])
+            return diaper
+        elif 'Nursing' in intent:
+            self.nursingRequests.append(request)
+            if 'Complete' in intent:
+                return self._HandleNursingRequests()
         else:
-            print("Bad request out of order...")
+            print ("Swing and a miss...")
+            return None
+        return None
+
+    # If it is a nursing message, build the nursing session up until 
+    # and end message is encountered. Once that is, log the actual request
+    # to the website
+    def _HandleNursingRequests(self):
+        nursing = None
+        for request in self.nursingRequests:
+            intent = request['action']
+            reqTime = request['time']
+            if 'NursingIntent' in intent:
+                side = 0
+                if request['intent'] == 'right':
+                    side = 1
+                nursing = LogTypes.Nursing(side=side, epoch=reqTime)
+                continue
+            if nursing is not None:
+                if 'NursingSwitchIntent' in intent:
+                    nursing.Switch(epoch=reqTime)
+                elif 'NursingPauseIntent' in intent:
+                    nursing.Pause(epoch=reqTime)
+                elif 'NursingResumeIntent' in intent:
+                    nursing.Resume(epoch=reqTime)
+                elif 'NursingCompleteIntent' in intent:
+                    nursing.GetTimes(epoch=reqTime)
+                    nursing.Finish(epoch=reqTime)
+                    tmpNursing = copy.copy(nursing)
+                    self.nursingRequests = []
+                    nursing=None
+                    return tmpNursing
+            else:
+                print("Bad request out of order...")

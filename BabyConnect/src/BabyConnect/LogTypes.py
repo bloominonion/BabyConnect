@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 
 class Diaper(object):
     type=None
@@ -44,6 +44,22 @@ class Diaper(object):
 
     def get_id(self):
         return self.id
+
+    def load_dict(self, data):
+        try:
+            if data['class'] == 'diaper':
+                self.type = data['type']
+                self.id = data['id']
+        except KeyError: 
+            print ("Could not load data.")
+
+    def as_dict(self):
+        data = {
+            "class" : "diaper",
+            "type" : self.type,
+            "id" : self.id
+        }
+        return data
 
 
 # Class for handling the time tracking of a nursing session.
@@ -132,3 +148,29 @@ class Nursing(object):
             "end":now.strftime("%I:%M%p"),
             "last":self.side
         }
+
+    def load_dict(self, data):
+        try:
+            if data['class'] == 'nursing':
+                self.timeBegin = data['start']
+                self.durL = data['left']
+                self.durR = data['right']
+                self.finishTime = data['end']
+                self.now = data['end']
+                self.side = data['last']
+                self.done = True
+        except KeyError: 
+            print ("Could not load data.")
+
+    def as_dict(self):
+        if not self.done:
+            self.Finish()
+        data = {
+            "class" : "nursing",
+            "start" : self.timeBegin,
+            "left" : self.durL,
+            "right" : self.durR,
+            "end" : self.finishTime,
+            "last" : self.side,
+        }
+        return data

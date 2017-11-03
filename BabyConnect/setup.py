@@ -19,10 +19,8 @@ setup(
         'BabyConnect.Web': webDir,
         'BabyConnect.Sqs': sqsDir,
         },
-    package_data={'BabyConnect/Sqs' : [sqsDir + '/aws_*']},
-    include_package_data=True,
     scripts=['src/BabyConnect-Service.py'],
-    install_requires=['selenium', 'pyvirtualdisplay', 'boto3'],
+    requires=['selenium', 'pyvirtualdisplay', 'boto3'],
     version='0.0.1',
-    website='https://github.com/bloominonion/BabyConnect'
+    url='https://github.com/bloominonion/BabyConnect'
     )
