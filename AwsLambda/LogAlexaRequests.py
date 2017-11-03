@@ -66,7 +66,12 @@ def log_diaper(intent, session):
     """ Logs a diaper """
 
     if 'diaperType' in intent['slots']:
-        diaperType = intent['slots']['diaperType']['value']
+        diaperType = None
+        try:
+            diaperType = intent['slots']['diaperType']['value']
+        except KeyError:
+            pass
+        print ("DiaperType:", diaperType)
 
         ok = False
         possibleTypes = "wet dirty poopy poop".split()
@@ -87,7 +92,11 @@ def nursing_start(intent, session):
     """ Starts a nursing session """
 
     if 'nursingSide' in intent['slots']:
-        nursingSide = intent['slots']['nursingSide']['value']
+        nursingSide = None
+        try:
+            nursingSide = intent['slots']['nursingSide']['value']
+        except KeyError:
+            pass
 
         side = 'right'
         if 'left' in nursingSide:
