@@ -2,9 +2,11 @@ import time
 import os
 from importlib import reload
 
-
-# Simple watchdog class to check for changes in source to reload the module file as needed
 class Watchdog:
+    '''
+    Simple watchdog class to check for changes in source 
+    to reload the module file as needed
+    '''
     def __init__(self, module):
         self._module = module
         self._filename = module.__file__

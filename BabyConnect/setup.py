@@ -1,3 +1,5 @@
+# Installer for the BabyConnect Package.
+
 from distutils.core import setup
 from textwrap import dedent
 

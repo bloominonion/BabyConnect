@@ -32,10 +32,10 @@ class WebInterface(object):
         self.user = user
         self.password = password
         self.driver = None
-        self.display = Display(visible=0, size=(1024, 768))
-        self.display.start()
 
         if platform.system() == 'Linux':
+            self.display = Display(visible=0, size=(1024, 768))
+            self.display.start()
             self.driver = webdriver.Firefox()
         else:
             self.driver = webdriver.Chrome()
@@ -84,8 +84,10 @@ class WebInterface(object):
 
         # Set type of diaper and log it.
         self.driver.find_element_by_id(diaper.id).click()
-        self.driver.find_element_by_css_selector(".ui-button-text-only .ui-button-text").click()
-        print ("Diaper logged...")
+        if self.driver.find_element_by_css_selector(".ui-button-text-only .ui-button-text").click():
+            return True
+        else:
+            return False
 
     def LogNursing(self, nursing):
         data = nursing.GetTimes()
@@ -123,8 +125,10 @@ class WebInterface(object):
         else:
             self.driver.find_element_by_id("last_right").click()
 
-        self.driver.find_element_by_css_selector(".ui-button-text-only .ui-button-text").click()
-        print ("Nursing session logged...")
+        if self.driver.find_element_by_css_selector(".ui-button-text-only .ui-button-text").click():
+            return True
+        else:
+            return False
 
 
 # if __name__ == '__main__':

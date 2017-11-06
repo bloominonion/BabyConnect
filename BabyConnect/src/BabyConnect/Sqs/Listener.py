@@ -21,6 +21,18 @@ def CheckInternet(host="8.8.8.8", port=53, timeout=3):
       return False
 
 class AwsMessageHandler(object):
+    '''
+    Handler for pending Amazon Aws messages that are translated to instances
+    of the BabyConnect types.
+    The major ability is to build up messages and turn them into single
+    instances of a class that represents a type.
+
+    Usage:
+        Init with sqs queue name, aws key, aws secret key, and aws region
+        (alternatively set after initialized)
+
+        Check for any requests that are converted using GetLogs()
+    '''
     def __init__(self, queue_name=None, aws_key_id=None, aws_secret_key=None, aws_region=None):
         self.key_id = aws_key_id
         self.key = aws_secret_key
@@ -32,17 +44,34 @@ class AwsMessageHandler(object):
         
 
     def AssignQueueName(self, name):
+        '''Assign Aws Sqs name to check for messages.'''
         if name is None or not isinstance(name, str):
             raise ValueError("Queue name is invalid")
         self.queue_name = name
 
     def ConfigureSessionCredentials(self, aws_key_id, aws_secret_key, aws_region):
+        '''Set the credentials to use when polling Aws.'''
         self.key_id = aws_key_id
         self.key = aws_secret_key
         self.region = aws_region
         self.configured = True
 
+    def GetLogs(self):
+        '''
+        Gets any pending requests that are complete into a BabyConnect
+        compatible type that can be used in the web logging interface.
+        '''
+        self._GetNewMessages()
+        logs = []
+        for log in self.requests:
+            action = self._ConvertRequest(log)
+            if action is not None:
+                logs.append(action)
+        self.requests = []
+        return logs
+
     def _CheckIfConfigured(self):
+        # Check to make sure the Aws parameters are set
         missing = []
         if self.key_id is None:
             missing.append('aws_key_id')
@@ -55,17 +84,8 @@ class AwsMessageHandler(object):
         if len(missing) > 0:
             raise AttributeError("Not configured. Missing the following:" + str(missing))
 
-    def GetLogs(self):
-        self._GetNewMessages()
-        logs = []
-        for log in self.requests:
-            action = self._ConvertRequest(log)
-            if action is not None:
-                logs.append(action)
-        self.requests = []
-        return logs
-
     def _GetNewMessages(self):
+        # Check the Sqs queue for any new messages and add them as pending
         self._CheckIfConfigured()
 
         queue = self._GetQueue()
@@ -123,6 +143,7 @@ class AwsMessageHandler(object):
 
     # Convert requests to an instance known to the web interface
     def _ConvertRequest(self, request):
+        # Converts a given message by type into a class instance
         intent = request['action']
         if 'LogDiaper' in intent:
             diaper = LogTypes.Diaper(request['intent'])

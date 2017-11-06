@@ -1,6 +1,13 @@
+# Classes to handle creation on BabyConnect Types programmatically.
+# Methods also support a to_json and from_json method so they can be 
+# dumped and reloaded from a json file
+
 from datetime import datetime
 
 class Diaper(object):
+    '''
+    Class to handle a diaper type request. 
+    '''
     type=None
     id=None
     ids = { 
@@ -61,10 +68,11 @@ class Diaper(object):
         }
         return data
 
-
-# Class for handling the time tracking of a nursing session.
-# This has the utilities to stop/start a session ans switch sides
 class Nursing(object):
+    '''
+    Class for handling the time tracking of a nursing session.
+    This has the utilities to stop/start a session and switch sides.
+    '''
     def __init__(self, side, timeL=None, timeR=None, epoch=None, debug=None):
         self.timeStart = datetime.now() if epoch is None else datetime.fromtimestamp(epoch)
         if epoch is None:

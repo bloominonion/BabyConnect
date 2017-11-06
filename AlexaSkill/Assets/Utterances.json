@@ -11,9 +11,11 @@ NursingIntent to begin nursing on {nursingSide}
 
 NursingSwitchIntent to switch sides
 NursingSwitchIntent to switch side
+NursingSwitchIntent to switch size
 NursingSwitchIntent to switch
 NursingSwitchIntent to change sides
 NursingSwitchIntent to change side
+NursingSwitchIntent to change size
 NursingSwitchIntent to change
 
 NursingPauseIntent to pause my nursing session
@@ -28,3 +30,5 @@ NursingResumeIntent to resume
 NursingCompleteIntent to stop nursing
 NursingCompleteIntent I'm done nursing
 NursingCompleteIntent finish nursing
+
+UnknownIntent to

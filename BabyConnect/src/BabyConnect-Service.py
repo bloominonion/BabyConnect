@@ -2,6 +2,7 @@ import sys
 import time
 import datetime
 import json
+import traceback
 from BabyConnect import LogTypes, YourSecrets
 from BabyConnect.LazyDaemon import Watchdog
 from BabyConnect.Sqs import Listener
@@ -22,8 +23,8 @@ def main():
     else:
         print ("Running without logfile")
 
-    app = LogMessages()
-    app.run()
+    with LogMessages() as app:
+        app.run()
 
 class LogMessages(object):
     '''
@@ -31,13 +32,31 @@ class LogMessages(object):
     into the Baby Connect Web nterface.
     This will enventually support running as a service so it can be started/
     stopped/restarted as needed.
+
+    Params:
+        dump    : dumpfile to use when application crashes or halts to save any
+                  pending work that hasn't been done.
+        interval: Interval to poll the server in minutes for messages.
+
     '''
-    def __init__(self, dump=None):
+    def __init__(self, dump=None, interval=None):
         self.dumpFile = dump if dump is not None else 'BabyConnectDump.json'
+        if interval is None:
+            self.interval = 5
         self.pendingRequests = []
         self._load_data()
 
     def __del__(self):
+        close(self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self ,type, value, traceback):
+        print ("Closing logger:", self.dumpFile)
+        close(self)
+
+    def close(self):
         self._dump_data()
 
     def _load_data(self):
@@ -80,8 +99,8 @@ class LogMessages(object):
 
     def _process(self):
         print ("Starting service...", datetime.datetime.now().strftime("%m-%d-%y %I:%M %p"))
-        timeSleep = 1 #(minutes)
-        connectionSleep = 1
+        timeSleep = self.interval #(minutes)
+        connectionSleep = 0.25
         
         watchdogs = [Watchdog(Listener), Watchdog(YourSecrets), Watchdog(LogData)]
         checkCount = 0
@@ -105,8 +124,8 @@ class LogMessages(object):
             connectionSleep = timeSleep
             checkCount += 1
             curTime = datetime.datetime.now()
-            # if abs(curTime.hour - 1) < 0.1:
-            #     time.sleep(5*60*60) #sleep 5 hours
+            if abs(curTime.hour - 1) < 0.1:
+                time.sleep(5*60*60) #sleep 5 hours
             if checkCount % 10 == 0:
                 print ("Checking server for requests...{}: {}".format(checkCount, curTime.strftime("%m-%d-%y %I:%M %p")))
             logs = SqsQueue.GetLogs()
@@ -121,16 +140,18 @@ class LogMessages(object):
                                               password=YourSecrets.BabyConnectLogin.password) as connection:
                         for log in logs:
                             if isinstance(log, LogTypes.Nursing):
-                                connection.LogNursing(log)
-                                print (log)
+                                if (connection.LogNursing(log)):
+                                    del(log)
                             elif isinstance(log, LogTypes.Diaper):
-                                connection.LogDiaper(log)
-                                print (log)
+                                if (connection.LogDiaper(log)):
+                                    del(log)
                             else:
                                 print ("Unable to handle log:", log)
                 except Exception as err:
                     print ("Failed to log:", err)
                     self.pendingRequests = logs
+                    traceback.print_exc()
+                self.pendingRequests = logs
             time.sleep(timeSleep*60)
 
 
