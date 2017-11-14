@@ -1,18 +1,22 @@
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import WebDriverException
+from selenium.webdriver.firefox.firefox_binary import FirefoxBinary
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from datetime import datetime, timedelta
 from pyvirtualdisplay import Display
 from BabyConnect.LogTypes import Diaper, Nursing
+from BabyConnect import YourSecrets
+import socket
 import platform
 import time
 import sys
 import os
 
 def main():
-    import Authorization
     print ("Test")
-    with WebInterface(user=Authorization.GetUser(), password=Authorization.GetPassword()) as con:
+    with WebInterface(user=YourSecrets.BabyConnectLogin.user, 
+                      password=YourSecrets.BabyConnectLogin.password) as con:
          con.LogDiaper("dirty and wet")
     #     sess = Nursing(0,500,500)
     #     con.LogNursing(sess)
@@ -33,12 +37,19 @@ class WebInterface(object):
         self.password = password
         self.driver = None
 
+        socket.setdefaulttimeout(30)
         if platform.system() == 'Linux':
-            self.display = Display(visible=0, size=(1024, 768))
-            self.display.start()
-            self.driver = webdriver.Firefox()
+            # self.display = Display(visible=1, size=(1024, 768))
+            # self.display.start()
+            binary = FirefoxBinary('/usr/bin/firefox')
+            caps = DesiredCapabilities().FIREFOX.copy()
+            self.driver = webdriver.Firefox(timeout=30,
+                                            capabilities=caps,
+                                            executable_path='/usr/bin/geckodriver',
+                                            firefox_binary=binary)
         else:
             self.driver = webdriver.Chrome()
+        self.driver.set_page_load_timeout(30)
         self.driver.get(self.url)
         elem = self.driver.find_element_by_name("email")
         elem.clear()
@@ -62,13 +73,11 @@ class WebInterface(object):
         self.__del__()
 
     def __del__(self):
-        if self.driver is not None:
-            try:
-                self.driver.close()
-            except WebDriverException:
-                pass
-        else:
-            print ("Driver non-existant at cleanup")
+        try:
+            self.driver.close()
+            self.driver.quit()
+        except:
+            pass
 
     def LogDiaper(self, logType):
         diaper = None
@@ -84,9 +93,10 @@ class WebInterface(object):
 
         # Set type of diaper and log it.
         self.driver.find_element_by_id(diaper.id).click()
-        if self.driver.find_element_by_css_selector(".ui-button-text-only .ui-button-text").click():
+        try:
+            self.driver.find_element_by_css_selector(".ui-button-text-only .ui-button-text").click()
             return True
-        else:
+        except:
             return False
 
     def LogNursing(self, nursing):
@@ -125,11 +135,12 @@ class WebInterface(object):
         else:
             self.driver.find_element_by_id("last_right").click()
 
-        if self.driver.find_element_by_css_selector(".ui-button-text-only .ui-button-text").click():
+        try:
+            self.driver.find_element_by_css_selector(".ui-button-text-only .ui-button-text").click()
             return True
-        else:
+        except:
             return False
 
 
-# if __name__ == '__main__':
-#     main()
+if __name__ == '__main__':
+    main()

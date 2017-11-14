@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import sys
 import time
 import datetime
@@ -23,7 +24,7 @@ def main():
     else:
         print ("Running without logfile")
 
-    with LogMessages() as app:
+    with LogMessages(interval=0.5) as app:
         app.run()
 
 class LogMessages(object):
@@ -43,39 +44,39 @@ class LogMessages(object):
         self.dumpFile = dump if dump is not None else 'BabyConnectDump.json'
         if interval is None:
             self.interval = 5
+        else:
+            self.interval = interval
         self.pendingRequests = []
         self._load_data()
-
-    def __del__(self):
-        close(self)
 
     def __enter__(self):
         return self
 
     def __exit__(self ,type, value, traceback):
         print ("Closing logger:", self.dumpFile)
-        close(self)
+        self.close()
 
     def close(self):
         self._dump_data()
 
     def _load_data(self):
         if exists(self.dumpFile):
+            print ("Loading previous session data...")
             with open(self.dumpFile, 'r') as dump:
-                data = json.load(self.dumpFile)
+                data = json.load(dump)
                 for item in data:
                     if item['class'] == 'nursing':
                         log = LogTypes.Nursing(0)
                         try:
                             log.load_dict(item)
-                            self.pendingRequests.append()
+                            self.pendingRequests.append(log)
                         except:
                             pass
                     if item['class'] == 'diaper':
                         log = LogTypes.Diaper('wet')
                         try:
                             log.load_dict(item)
-                            self.pendingRequests.append()
+                            self.pendingRequests.append(log)
                         except:
                             pass
             remove(self.dumpFile)
@@ -92,7 +93,7 @@ class LogMessages(object):
     def run(self):
         try:
             self._process()
-        except :
+        except:
             self._dump_data()
             exc_info = sys.exc_info()
             raise exc_info[0].with_traceback(exc_info[1], exc_info[2])
@@ -101,7 +102,7 @@ class LogMessages(object):
         print ("Starting service...", datetime.datetime.now().strftime("%m-%d-%y %I:%M %p"))
         timeSleep = self.interval #(minutes)
         connectionSleep = 0.25
-        
+
         watchdogs = [Watchdog(Listener), Watchdog(YourSecrets), Watchdog(LogData)]
         checkCount = 0
         SqsQueue = Listener.AwsMessageHandler(queue_name=YourSecrets.Sqs.QueueName,
@@ -115,7 +116,7 @@ class LogMessages(object):
                 print ("Failed to connect to internet..trying again in {} minutes".format(connectionSleep))
                 time.sleep(connectionSleep*60)
                 connectionSleep *= 2
-            
+
             # Check for module file updates
             for watchdog in watchdogs:
                 watchdog.check()
@@ -130,6 +131,7 @@ class LogMessages(object):
                 print ("Checking server for requests...{}: {}".format(checkCount, curTime.strftime("%m-%d-%y %I:%M %p")))
             logs = SqsQueue.GetLogs()
             logs += self.pendingRequests
+            self.pendingRequests = []
 
             if len(logs) > 0:
                 print ("\nRequests to log:")
@@ -138,13 +140,13 @@ class LogMessages(object):
                 try:
                     with LogData.WebInterface(user=YourSecrets.BabyConnectLogin.user, 
                                               password=YourSecrets.BabyConnectLogin.password) as connection:
-                        for log in logs:
+                        for i, log in enumerate(logs):
                             if isinstance(log, LogTypes.Nursing):
                                 if (connection.LogNursing(log)):
-                                    del(log)
+                                    del(logs[i])
                             elif isinstance(log, LogTypes.Diaper):
                                 if (connection.LogDiaper(log)):
-                                    del(log)
+                                    del(logs[i])
                             else:
                                 print ("Unable to handle log:", log)
                 except Exception as err:
