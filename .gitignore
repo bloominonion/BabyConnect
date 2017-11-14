@@ -50,3 +50,4 @@ Temporary Items
 AwsCredentials.txt
 WebLogin/Authorization.py
 BabyConnectAlexaSkill.sublime-workspace
+BabyConnect/src/BabyConnect/YourSecrets.py
